@@ -196,7 +196,9 @@ class BaseModel(ABC):
                 # patch InstanceNorm checkpoints prior to 0.4
                 for key in list(state_dict.keys()):  # need to copy keys here because we mutate in loop
                     self.__patch_instance_norm_state_dict(state_dict, net, key.split('.'))
-                net.load_state_dict(state_dict)
+
+                net.load_state_dict(state_dict)                 #error running in debug mode
+                print('loaded model from %s' % load_path)
 
     def print_networks(self, verbose):
         """Print the total number of parameters in the network and (if verbose) network architecture

@@ -18,5 +18,6 @@ TAR_FILE=./datasets/$FILE.tar.gz
 TARGET_DIR=./datasets/$FILE/
 wget -N $URL -O $TAR_FILE
 mkdir -p $TARGET_DIR
-tar -zxvf $TAR_FILE -C ./datasets/
+
+tar -zxf $TAR_FILE -C ./datasets/
 rm $TAR_FILE
