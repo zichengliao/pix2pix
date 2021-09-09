@@ -41,8 +41,8 @@ if __name__ == '__main__':
         epoch_iter = 0  # the number of training iterations in current epoch, reset to 0 every epoch
         visualizer.reset()  # reset the visualizer: make sure it saves the results to HTML at least once every epoch
         # model.update_learning_rate()  # update learning rates in the beginning of every epoch.
-        import warnings
 
+        import warnings
         warnings.filterwarnings('ignore')
         for i, data in enumerate(dataset):  # inner loop within one epoch
             iter_start_time = time.time()  # timer for computation per iteration
@@ -66,17 +66,17 @@ if __name__ == '__main__':
                 if opt.display_id > 0:
                     visualizer.plot_current_losses(epoch, float(epoch_iter) / dataset_size, losses)
 
-            if total_iters % opt.save_latest_freq == 0:  # cache our latest model every <save_latest_freq> iterations
-                print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
-                save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
-                model.save_networks(save_suffix)
+            # if total_iters % opt.save_latest_freq == 0:  # cache our latest model every <save_latest_freq> iterations
+            #    print('saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iters))
+            #    save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
+            #    model.save_networks(save_suffix)
 
             iter_data_time = time.time()
 
         model.update_learning_rate()  # update lr after epoch optimization
 
         model.compute_visuals()
-        visualizer.display_current_results(model.get_current_visuals(), epoch, True)  # save visuals for every epoch
+        visualizer.display_current_results(model.get_current_visuals(), epoch, True)  # save images to checkpoints/~/web
         if epoch % opt.save_epoch_freq == 0:  # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
