@@ -36,7 +36,7 @@ class TemplateModel(BaseModel):
         if is_train:
             parser.add_argument('--lambda_regression', type=float, default=1.0, help='weight for the regression loss')  # You can define new arguments for this model.
 
-        return parser
+        # return parser
 
     def __init__(self, opt):
         """Initialize this model class.
@@ -69,16 +69,16 @@ class TemplateModel(BaseModel):
 
         # Our program will automatically call <model.setup> to define schedulers, load networks, and print networks
 
-    def set_input(self, input):
-        """Unpack input data from the dataloader and perform necessary pre-processing steps.
-
-        Parameters:
-            input: a dictionary that contains the data itself and its metadata information.
-        """
-        AtoB = self.opt.direction == 'AtoB'  # use <direction> to swap data_A and data_B
-        self.data_A = input['A' if AtoB else 'B'].to(self.device)  # get image data A
-        self.data_B = input['B' if AtoB else 'A'].to(self.device)  # get image data B
-        self.image_paths = input['A_paths' if AtoB else 'B_paths']  # get image paths
+    # def set_input(self, data):
+    #     """Unpack input data from the dataloader and perform necessary pre-processing steps.
+    #
+    #     Parameters:
+    #         data: a dictionary that contains the data itself and its metadata information.
+    #     """
+    #     AtoB = self.opt.direction == 'AtoB'  # use <direction> to swap data_A and data_B
+    #     self.data_A = input['A' if AtoB else 'B'].to(self.device)  # get image data A
+    #     self.data_B = input['B' if AtoB else 'A'].to(self.device)  # get image data B
+    #     self.image_paths = input['A_paths' if AtoB else 'B_paths']  # get image paths
 
     def forward(self):
         """Run forward pass. This will be called by both functions <optimize_parameters> and <test>."""
@@ -91,7 +91,7 @@ class TemplateModel(BaseModel):
         self.loss_G = self.criterionLoss(self.output, self.data_B) * self.opt.lambda_regression
         self.loss_G.backward()       # calculate gradients of network G w.r.t. loss_G
 
-    def optimize_parameters(self):
+    def __train__(self):
         """Update network weights; it will be called in every training iteration."""
         self.forward()               # first call forward to calculate intermediate results
         self.optimizer.zero_grad()   # clear network G's existing gradients

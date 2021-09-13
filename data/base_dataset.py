@@ -40,7 +40,7 @@ class BaseDataset(data.Dataset, ABC):
         Returns:
             the modified parser.
         """
-        return parser
+        # return parser
 
     @abstractmethod
     def __len__(self):

@@ -27,7 +27,7 @@ class ColorizationDataset(BaseDataset):
         the number of channels for output image is 2 (ab). The direction is from A to B
         """
         parser.set_defaults(input_nc=1, output_nc=2, direction='AtoB')
-        return parser
+        # return parser
 
     def __init__(self, opt):
         """Initialize this dataset class.

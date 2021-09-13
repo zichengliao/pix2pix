@@ -21,8 +21,8 @@ class CycleGANModel(BaseModel):
         """Add new dataset-specific options, and rewrite default values for existing options.
 
         Parameters:
-            parser          -- original option parser
-            is_train (bool) -- whether training phase or test phase. You can use this flag to add training-specific or test-specific options.
+            parser:           original option parser
+            is_train (bool):  whether training phase or test phase. You can use this flag to add training-specific or test-specific options.
 
         Returns:
             the modified parser.
@@ -42,7 +42,7 @@ class CycleGANModel(BaseModel):
             parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
             parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
 
-        return parser
+        # return parser
 
     def __init__(self, opt):
         """Initialize the CycleGAN class.
@@ -96,18 +96,16 @@ class CycleGANModel(BaseModel):
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
 
-    def set_input(self, input):
-        """Unpack input data from the dataloader and perform necessary pre-processing steps.
-
-        Parameters:
-            input (dict): include the data itself and its metadata information.
-
-        The option 'direction' can be used to swap domain A and domain B.
-        """
-        AtoB = self.opt.direction == 'AtoB'
-        self.real_A = input['A' if AtoB else 'B'].to(self.device)
-        self.real_B = input['B' if AtoB else 'A'].to(self.device)
-        self.image_paths = input['A_paths' if AtoB else 'B_paths']
+    # def set_input(self, input):
+    #     """Unpack input data from the dataloader and perform necessary pre-processing steps.
+    #
+    #     Parameters:
+    #         input (dict): include the data itself and its metadata information.
+    #     """
+    #     AtoB = self.opt.direction == 'AtoB'
+    #     self.real_A = input['A' if AtoB else 'B'].to(self.device)
+    #     self.real_B = input['B' if AtoB else 'A'].to(self.device)
+    #     self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
@@ -177,17 +175,17 @@ class CycleGANModel(BaseModel):
         self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + self.loss_idt_A + self.loss_idt_B
         self.loss_G.backward()
 
-    def optimize_parameters(self):
+    def __train__(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         # forward
         self.forward()      # compute fake images and reconstruction images.
         # G_A and G_B
-        self.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
+        networks.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
         self.optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
         self.backward_G()             # calculate gradients for G_A and G_B
         self.optimizer_G.step()       # update G_A and G_B's weights
         # D_A and D_B
-        self.set_requires_grad([self.netD_A, self.netD_B], True)
+        networks.set_requires_grad([self.netD_A, self.netD_B], True)
         self.optimizer_D.zero_grad()   # set D_A and D_B's gradients to zero
         self.backward_D_A()      # calculate gradients for D_A
         self.backward_D_B()      # calculate graidents for D_B

@@ -13,8 +13,8 @@ class CycleGANTestModel(BaseModel):
         """Add new dataset-specific options, and rewrite default values for existing options.
 
         Parameters:
-            parser          -- original option parser
-            is_train (bool) -- whether training phase or test phase. You can use this flag to add training-specific or test-specific options.
+            parser:           original option parser
+            is_train (bool):  whether training phase or test phase. You can use this flag to add training-specific or test-specific options.
 
         Returns:
             the modified parser.
@@ -26,7 +26,7 @@ class CycleGANTestModel(BaseModel):
         parser.set_defaults(dataset_mode='single')
         parser.add_argument('--model_suffix', type=str, default='', help='In checkpoints_dir, [epoch]_net_G[model_suffix].pth will be loaded as the generator.')
 
-        return parser
+        # return parser
 
     def __init__(self, opt):
         """Initialize the pix2pix class.
@@ -49,21 +49,21 @@ class CycleGANTestModel(BaseModel):
         # please see <BaseModel.load_networks>
         setattr(self, 'netG' + opt.model_suffix, self.netG)  # store netG in self.
 
-    def set_input(self, input):
+    def set_input(self, data):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
 
         Parameters:
-            input: a dictionary that contains the data itself and its metadata information.
+            data: a dictionary that contains the data itself and its metadata information.
 
         We need to use 'single_dataset' dataset mode. It only load images from one domain.
         """
-        self.real = input['A'].to(self.device)
-        self.image_paths = input['A_paths']
+        self.real = data['A'].to(self.device)
+        self.image_paths = data['A_paths']
 
     def forward(self):
         """Run forward pass."""
         self.fake = self.netG(self.real)  # G(real)
 
-    def optimize_parameters(self):
+    def __train__(self):
         """No optimization for test model."""
         pass
