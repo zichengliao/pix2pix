@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     for epoch in range(1, opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs
         epoch_start_time = time.time()  # timer for entire epoch
-        iter_data_time = time.time()  # timer for data loading per iteration
+        # iter_data_time = time.time()  # timer for data loading per iteration
         epoch_iters = 0  # the number of training iterations in current epoch, reset to 0 every epoch
         visualizer.reset()  # reset the visualizer: make sure it saves the results to HTML at least once every epoch
         # model.update_learning_rate()  # update learning rates in the beginning of every epoch.
@@ -69,17 +69,15 @@ if __name__ == '__main__':
             #    save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
             #    model.save_networks(save_suffix)
 
-            iter_data_time = time.time()
-
         print('End of epoch %d / %d \t Time Taken: %d sec \\' % (opt.epoch_from + epoch,  opt.epoch_from + opt.n_epochs + opt.n_epochs_decay, time.time() - epoch_start_time))
         model.update_learning_rate()  # update lr after epoch optimization
 
         model.compute_visuals()
         visualizer.display_current_results(model.get_current_visuals(), opt.epoch_from + epoch, True)  # save images to checkpoints/~/web
         if epoch % opt.save_epoch_freq == 0:  # cache our model every <save_epoch_freq> epochs
-            model.save_networks(epoch)
-            print('saved models at the end of epoch %d' % opt.epoch_from + epoch)
+            model.save_networks(opt.epoch_from + epoch)
+            print('saved models at the end of epoch %d' % (opt.epoch_from + epoch))
 
     model.save_networks('latest')
-    print('saved the latest models at the end of epoch %d' % opt.epoch_from + epoch)
+    print('saved the latest models at the end of epoch %d' % (opt.epoch_from + epoch))
     print('Training process finished! Hooray~')
