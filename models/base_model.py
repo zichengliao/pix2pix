@@ -43,7 +43,6 @@ class BaseModel(ABC):
         self.schedulers = []
         self.image_paths = []
         self.metric = 0  # used for learning rate policy 'plateau'
-        self.epoch = 0
 
     @staticmethod
     def modify_commandline_options(parser, is_train):

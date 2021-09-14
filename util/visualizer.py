@@ -17,7 +17,7 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
     """Save images to the disk.
 
     Parameters:
-        webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
+        webpage (the HTML class) -- the HTML webpage class that stores these images (see html.py for more details)
         visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
         image_path (str)         -- the string is used to create image paths
         aspect_ratio (float)     -- the aspect ratio of saved images
@@ -30,7 +30,7 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
     name = os.path.splitext(short_path)[0]
 
     webpage.add_header(name)
-    ims, txts, links = [], [], []
+    ims, text, links = [], [], []
 
     for label, im_data in visuals.items():
         im = util.tensor2im(im_data)
@@ -38,9 +38,9 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
         save_path = os.path.join(image_dir, image_name)
         util.save_image(im, save_path, aspect_ratio=aspect_ratio)
         ims.append(image_name)
-        txts.append(label)
+        text.append(label)
         links.append(image_name)
-    webpage.add_images(ims, txts, links, width=width)
+    webpage.add_images(ims, text, links, width=width)
 
 
 class Visualizer():
@@ -56,7 +56,7 @@ class Visualizer():
             opt -- stores all the experiment flags; needs to be a subclass of BaseOptions
         Step 1: Cache the training/test options
         Step 2: connect to a visdom server
-        Step 3: create an HTML object for saveing HTML filters
+        Step 3: create an HTML object for saving HTML filters
         Step 4: create a logging file to store training losses
         """
         self.opt = opt  # cache the option
@@ -165,15 +165,15 @@ class Visualizer():
             webpage = html.HTML(self.web_dir, 'Experiment name = %s' % self.name, refresh=1)
             for n in range(epoch, 0, -1):
                 webpage.add_header('epoch [%d]' % n)
-                ims, txts, links = [], [], []
+                ims, text, links = [], [], []
 
                 for label, image_numpy in visuals.items():
                     image_numpy = util.tensor2im(image)
                     img_path = 'epoch%.3d_%s.png' % (n, label)
                     ims.append(img_path)
-                    txts.append(label)
+                    text.append(label)
                     links.append(img_path)
-                webpage.add_images(ims, txts, links, width=self.win_size)
+                webpage.add_images(ims, text, links, width=self.win_size)
             webpage.save()
 
     def plot_current_losses(self, epoch, counter_ratio, losses):

@@ -81,7 +81,7 @@ def get_norm_layer(norm_type='instance'):
     elif norm_type == 'instance':
         norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
     elif norm_type == 'none':
-        def norm_layer(x): return Identity()
+        def norm_layer(): return Identity()
     else:
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
     return norm_layer
@@ -200,7 +200,7 @@ class NLayerDiscriminator(nn.Module):
         padw = 1
         sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
         nf_mult = 1
-        nf_mult_prev = 1    ####
+        # nf_mult_prev = 1    ####
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
@@ -285,26 +285,9 @@ class GANLoss(nn.Module):
         elif gan_mode == 'vanilla':
             self.loss = nn.BCEWithLogitsLoss()
         elif gan_mode in ['wgangp']:
-            self.loss = None            ####
+            self.loss = None            #implemented in __call__(..)
         else:
             raise NotImplementedError('gan mode %s not implemented' % gan_mode)
-
-    def get_target_tensor(self, prediction, target_is_real):
-        """Create label tensors with the same size as the input.
-
-        Parameters:
-            prediction (tensor) - - typically the prediction from a discriminator
-            target_is_real (bool) - - if the ground truth label is for real images or fake images
-
-        Returns:
-            A label tensor filled with ground truth label, and with the size of the input
-        """
-
-        if target_is_real:
-            target_tensor = self.real_label
-        else:
-            target_tensor = self.fake_label
-        return target_tensor.expand_as(prediction)
 
     def __call__(self, prediction, target_is_real):
         """Calculate loss given Discriminator's output and ground truth labels.
@@ -324,7 +307,26 @@ class GANLoss(nn.Module):
                 loss = -prediction.mean()
             else:
                 loss = prediction.mean()
+
         return loss
+
+    def get_target_tensor(self, prediction, target_is_real):
+        """Create label tensors with the same size as the input.
+
+        Parameters:
+            prediction (tensor) - - typically the prediction from a discriminator
+            target_is_real (bool) - - if the ground truth label is for real images or fake images
+
+        Returns:
+            A label tensor filled with ground truth label, and with the size of the input
+        """
+
+        # if target_is_real:
+        #     target_tensor = self.real_label
+        # else:
+        #     target_tensor = self.fake_label
+        target_tensor = self.real_label if target_is_real else self.fake_label
+        return target_tensor.expand_as(prediction)
 
 
 class ResnetGenerator(nn.Module):
@@ -408,7 +410,7 @@ class ResnetBlock(nn.Module):
         Parameters:
             dim (int)           -- the number of channels in the conv layer.
             padding_type (str)  -- the name of padding layer: reflect | replicate | zero
-            norm_layer          -- normalization layer
+            norm_layer ()       -- normalization layer
             use_dropout (bool)  -- if use dropout layers.
             use_bias (bool)     -- if the conv layer uses bias or not
 
@@ -557,7 +559,6 @@ def get_scheduler(optimizer, opt):
     """Return a learning rate scheduler
 
     Parameters:
-        model:              [pix2pix | cycle_gan | colorization ...]
         optimizer:          the optimizer of the network
         opt (option class): stores all the experiment flags; needs to be a subclass of BaseOptions．　
                               opt.lr_policy is the name of learning rate policy: linear | step | plateau | cosine
@@ -606,7 +607,7 @@ def cal_gradient_penalty(netD, real_data, fake_data, device, dtype='mixed', cons
         real_data (tensor array)    -- real images
         fake_data (tensor array)    -- generated images from the generator
         device (str)                -- GPU / CPU: from torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')
-        type (str)                  -- if we mix real and fake data or not [real | fake | mixed].
+        dtype (str)                  -- if we mix real and fake data or not [real | fake | mixed].
         constant (float)            -- the constant used in formula ( ||gradient||_2 - constant)^2
         lambda_gp (float)           -- weight for this loss
 
