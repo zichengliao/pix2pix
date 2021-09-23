@@ -8,17 +8,19 @@ class TestOptions(BaseOptions):
     """
 
     def initialize(self, parser):
-        BaseOptions.initialize(self, parser)  # define shared options
+        # BaseOptions.initialize(self, parser)  # define shared options
+        super().initialize(parser)
         ####
         parser.add_argument('--aspect_ratio', type=float, default=1.0, help='aspect ratio of result images')
         parser.add_argument('--phase', type=str, default='test', help='train, val, test, etc')
         # Dropout and Batchnorm has different behavior during training and test.
         parser.add_argument('--eval', action='store_true', help='use eval mode during test time.')
         parser.add_argument('--num_test', type=int, default=50, help='how many test images to run')
+
         # rewrite devalue values
-        ## parser.set_defaults(model='cycle_gan_test')        # TestModel may be possibly used for CycleGANModel
+        # parser.set_defaults(model='cycle_gan_test')        # TestModel may be possibly used for CycleGANModel
         # To avoid cropping, the load_size should be the same as crop_size
         parser.set_defaults(load_size=parser.get_default('crop_size'))
-
+        parser.set_defaults(num_thread=0, batch_size=1, display_id=-1)
         self.isTrain = False
         # return parser

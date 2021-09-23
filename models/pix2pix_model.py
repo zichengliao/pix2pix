@@ -26,7 +26,9 @@ class Pix2PixModel(BaseModel):
         By default, we use vanilla GAN loss, UNet with batchnorm, and aligned datasets.
         """
         # changing the default values to match the pix2pix paper (https://phillipi.github.io/pix2pix/)
-        parser.set_defaults(norm='batch', netG='unet_256', dataset_mode='aligned')
+        parser.set_defaults(norm='batch', netG='unet_256', dataset_mode='aligned')  # norm = BatchNorm2d
+        # parser.set_defaults(norm='batch', netG='resnet_6blocks', dataset_mode='aligned')  # norm = BatchNorm2d
+
         if is_train:
             parser.set_defaults(pool_size=0, gan_mode='vanilla')
             parser.add_argument('--lambda_L1', type=float, default=100.0, help='weight for L1 loss')
@@ -39,7 +41,8 @@ class Pix2PixModel(BaseModel):
         Parameters:
             opt (Option class)-- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
-        BaseModel.__init__(self, opt)
+        # BaseModel.__init__(self, opt)
+        super().__init__(opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         self.loss_names = ['G_GAN', 'G_L1', 'D_real', 'D_fake']
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
@@ -49,6 +52,11 @@ class Pix2PixModel(BaseModel):
             self.model_names = ['G', 'D']
         else:  # during test time, only load G
             self.model_names = ['G']
+        self.fake_B = []
+        self.loss_G_GAN = []
+        self.loss_G_L1 = []
+        self.loss_D_fake = []
+        self.loss_D_real = []
 
         # define generator network
         self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
@@ -81,7 +89,7 @@ class Pix2PixModel(BaseModel):
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-        self.fake_B = self.netG(self.real_A)  # G(A)
+        self.fake_B = self.netG(self.real_A)  # netG(A)
 
     def backward_D(self):
         """Calculate GAN loss for the discriminator"""
@@ -94,8 +102,8 @@ class Pix2PixModel(BaseModel):
         pred_real = self.netD(real_AB)
         self.loss_D_real = self.criterionGAN(pred_real, True)       # discriminator predicted real_AB against 'True'
         # combine loss and calculate gradients
-        self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5   # GAN loss with fake_AB and real_AB for discriminator
-        self.loss_D.backward()
+        loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5   # GAN loss with fake_AB and real_AB for discriminator
+        loss_D.backward()
 
     def backward_G(self):
         """Calculate GAN and L1 loss for the generator"""
@@ -106,8 +114,8 @@ class Pix2PixModel(BaseModel):
         # Second, G(A) = B
         self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
         # combine loss and calculate gradients
-        self.loss_G = self.loss_G_GAN + self.loss_G_L1              # GAN loss (from D) + (real_B-fake_B) L1 loss for generator
-        self.loss_G.backward()
+        loss_G = self.loss_G_GAN + self.loss_G_L1              # GAN loss (from D) + (real_B-fake_B) L1 loss for generator
+        loss_G.backward()
 
     def __train__(self):
         self.forward()                   # compute fake images: G(A)

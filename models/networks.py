@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.nn import init
-import functools
 from torch.optim import lr_scheduler
+#import functools
 
 
 ###############################################################################
@@ -11,7 +11,8 @@ from torch.optim import lr_scheduler
 
 
 class Identity(nn.Module):
-    def forward(self, x):
+    @staticmethod
+    def forward(x):
         return x
 
 
@@ -49,7 +50,7 @@ def init_weights(net, init_type='normal', init_gain=0.02):
     net.apply(init_func)  # apply the initialization function <init_func>
 
 
-def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=None):
     """Initialize a network: 1. register CPU/GPU device (with multi-GPU support); 2. initialize the network weights
     Parameters:
         net (network)      -- the network to be initialized
@@ -59,9 +60,9 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
 
     Return an initialized network.
     """
-    if len(gpu_ids) > 0:
+    if gpu_ids is not None and len(gpu_ids) > 0:
         assert(torch.cuda.is_available())
-        net.to(gpu_ids[0])
+        net.to(gpu_ids[0])  # or: net.cuda()
         net = torch.nn.DataParallel(net, gpu_ids)  # multi-GPUs
     init_weights(net, init_type, init_gain=init_gain)
     return net
@@ -77,25 +78,26 @@ def get_norm_layer(norm_type='instance'):
     For InstanceNorm, we do not use learnable affine parameters. We do not track running statistics.
     """
     if norm_type == 'batch':
-        norm_layer = functools.partial(nn.BatchNorm2d, affine=True, track_running_stats=True)
+        norm_layer = nn.BatchNorm2d  #functools.partial(nn.BatchNorm2d, affine=True, track_running_stats=True)
     elif norm_type == 'instance':
-        norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
+        norm_layer = nn.InstanceNorm2d  #functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
     elif norm_type == 'none':
         def norm_layer(): return Identity()
     else:
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
-    return norm_layer
+    use_bias = norm_type == 'instance'
+    return norm_layer, use_bias
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_G(input_nc, output_nc, ngf, netG_type, norm_type='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=None):
     """Create a generator
 
     Parameters:
         input_nc (int) -- the number of channels in input images
         output_nc (int) -- the number of channels in output images
         ngf (int) -- the number of filters in the last conv layer
-        netG (str) -- the architecture's name: resnet_9blocks | resnet_6blocks | unet_256 | unet_128
-        norm (str) -- the name of normalization layers used in the network: batch | instance | none
+        netG_type (str) -- the architecture's name: resnet_9blocks | resnet_6blocks | unet_256 | unet_128
+        norm_type (str) -- the name of normalization layers used in the network: batch | instance | none
         use_dropout (bool) -- if use dropout layers.
         init_type (str)    -- the name of our initialization method.
         init_gain (float)  -- scaling factor for normal, xavier and orthogonal.
@@ -115,30 +117,31 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
     The generator has been initialized by <init_net>. It uses RELU for non-linearity.
     """
     # net = None
-    norm_layer = get_norm_layer(norm_type=norm)
+    norm_layer, use_bias = get_norm_layer(norm_type)
 
-    if netG == 'resnet_9blocks':
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=9)
-    elif netG == 'resnet_6blocks':
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=6)
-    elif netG == 'unet_128':
-        net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
-    elif netG == 'unet_256':
-        net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+    if netG_type == 'resnet_9blocks':
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_bias=use_bias, use_dropout=use_dropout, n_blocks=9)
+    elif netG_type == 'resnet_6blocks':
+        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_bias=use_bias, use_dropout=use_dropout, n_blocks=6)
+    elif netG_type == 'unet_128':
+        net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_bias=use_bias, use_dropout=use_dropout)
+    elif netG_type == 'unet_256':
+        net = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_bias=use_bias, use_dropout=use_dropout)
     else:
-        raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
+        raise NotImplementedError('Generator model name [%s] is not recognized' % netG_type)
+
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_D(input_nc, ndf, netD_type, n_layers=3, norm_type='batch', init_type='normal', init_gain=0.02, gpu_ids=None):
     """Create a discriminator
 
     Parameters:
         input_nc (int)     -- the number of channels in input images
         ndf (int)          -- the number of filters in the first conv layer
-        netD (str)         -- the architecture's name: basic | n_layers | pixel
-        n_layers_D (int)   -- the number of conv layers in the discriminator; effective when netD=='n_layers'
-        norm (str)         -- the type of normalization layers used in the network.
+        netD_type (str)    -- the architecture's name: basic | n_layers | pixel
+        n_layers (int)     -- the number of conv layers in the discriminator; effective when netD=='n_layers'
+        norm_type (str)    -- the type of normalization layers used in the network.
         init_type (str)    -- the name of the initialization method.
         init_gain (float)  -- scaling factor for normal, xavier and orthogonal.
         gpu_ids (int list) -- which GPUs the network runs on: e.g., 0,1,2
@@ -161,17 +164,16 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
     The discriminator has been initialized by <init_net>. It uses Leaky RELU for non-linearity.
     """
     # net = None
-    norm_layer = get_norm_layer(norm_type=norm)
+    norm_layer, use_bias = get_norm_layer(norm_type)
 
-    if netD == 'basic':  # default PatchGAN classifier
+    if netD_type == 'basic':  # default PatchGAN classifier
         # net = NLayerDiscriminator(input_nc, ndf, n_layers=3, norm_layer=norm_layer)
-        net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)   # n_layers_D configurable (3 is previous basic type config)
-    # elif netD == 'n_layers':  # more options
-    #    net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
-    elif netD == 'pixel':     # classify if each pixel is real or fake
-        net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
+        net = NLayerDiscriminator(input_nc, ndf, n_layers, norm_layer, use_bias)   # n_layers_D configurable (3 is previous basic type config)
+    elif netD_type == 'pixel':     # classify if each pixel is real or fake
+        net = PixelDiscriminator(input_nc, ndf, norm_layer, use_bias)
     else:
-        raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
+        raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD_type)
+
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
@@ -181,7 +183,7 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
 class NLayerDiscriminator(nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_bias=False):
         """Construct a PatchGAN discriminator
 
         Parameters:
@@ -190,11 +192,12 @@ class NLayerDiscriminator(nn.Module):
             n_layers (int)  -- the number of conv layers in the discriminator
             norm_layer      -- normalization layer
         """
-        super(NLayerDiscriminator, self).__init__()
-        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
+        # super(NLayerDiscriminator, self).__init__()
+        super().__init__()
+        # if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
+        #     use_bias = (norm_layer.func == nn.InstanceNorm2d)
+        # else:
+        #     use_bias = (norm_layer == nn.InstanceNorm2d)
 
         kw = 4
         padw = 1
@@ -229,7 +232,7 @@ class NLayerDiscriminator(nn.Module):
 class PixelDiscriminator(nn.Module):
     """Defines a 1x1 PatchGAN discriminator (pixelGAN)"""
 
-    def __init__(self, input_nc, ndf=64, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, ndf=64, norm_layer=nn.BatchNorm2d, use_bias=False):
         """Construct a 1x1 PatchGAN discriminator
 
         Parameters:
@@ -237,11 +240,11 @@ class PixelDiscriminator(nn.Module):
             ndf (int)       -- the number of filters in the last conv layer
             norm_layer      -- normalization layer
         """
-        super(PixelDiscriminator, self).__init__()
-        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
+        super().__init__()
+        # if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
+        #     use_bias = norm_layer.func == nn.InstanceNorm2d
+        # else:
+        #     use_bias = norm_layer == nn.InstanceNorm2d
 
         self.net = [
             nn.Conv2d(input_nc, ndf, kernel_size=1, stride=1, padding=0),
@@ -251,11 +254,11 @@ class PixelDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, True),
             nn.Conv2d(ndf * 2, 1, kernel_size=1, stride=1, padding=0, bias=use_bias)]
 
-        self.net = nn.Sequential(*self.net)
+        self.model = nn.Sequential(*self.net)
 
     def forward(self, data):
         """Standard forward."""
-        return self.net(data)
+        return self.model(data)
 
 
 class GANLoss(nn.Module):
@@ -276,16 +279,17 @@ class GANLoss(nn.Module):
         Note: Do not use sigmoid as the last layer of Discriminator.
         LSGAN needs no sigmoid. vanilla GANs will handle it with BCEWithLogitsLoss.
         """
-        super(GANLoss, self).__init__()
+        # super(GANLoss, self).__init__()
+        super().__init__()
         self.register_buffer('real_label', torch.tensor(target_real_label))
         self.register_buffer('fake_label', torch.tensor(target_fake_label))
         self.gan_mode = gan_mode
-        if gan_mode == 'lsgan':
-            self.loss = nn.MSELoss()
-        elif gan_mode == 'vanilla':
+        if gan_mode == 'vanilla':
             self.loss = nn.BCEWithLogitsLoss()
+        elif gan_mode == 'lsgan':
+            self.loss = nn.MSELoss()
         elif gan_mode in ['wgangp']:
-            self.loss = None            #implemented in __call__(..)
+            self.loss = None            # self.loss implemented in __call__(..)
         else:
             raise NotImplementedError('gan mode %s not implemented' % gan_mode)
 
@@ -303,10 +307,13 @@ class GANLoss(nn.Module):
             target_tensor = self.get_target_tensor(prediction, target_is_real)
             loss = self.loss(prediction, target_tensor)
         elif self.gan_mode == 'wgangp':
-            if target_is_real:
-                loss = -prediction.mean()
-            else:
-                loss = prediction.mean()
+            # if target_is_real:
+            #     loss = -prediction.mean()
+            # else:
+            #     loss = prediction.mean()
+            loss = -prediction.mean() if target_is_real else prediction.mean()
+        else:
+            raise NotImplementedError('gan mode %s not implemented' % self.gan_mode)
 
         return loss
 
@@ -335,7 +342,7 @@ class ResnetGenerator(nn.Module):
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect'):
+    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_bias=False, use_dropout=False, n_blocks=6, padding_type='reflect'):
         """Construct a Resnet-based generator
 
         Parameters:
@@ -348,11 +355,11 @@ class ResnetGenerator(nn.Module):
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
         """
         assert(n_blocks >= 0)
-        super(ResnetGenerator, self).__init__()
-        if type(norm_layer) == functools.partial:
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
+        super().__init__()
+        # if type(norm_layer) == functools.partial:
+        #     use_bias = norm_layer.func == nn.InstanceNorm2d
+        # else:
+        #     use_bias = norm_layer == nn.InstanceNorm2d
 
         model = [nn.ReflectionPad2d(3),
                  nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
@@ -369,7 +376,7 @@ class ResnetGenerator(nn.Module):
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
 
-            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_bias=use_bias, use_dropout=use_dropout)]
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
@@ -383,7 +390,9 @@ class ResnetGenerator(nn.Module):
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
         model += [nn.Tanh()]
 
+        ####################################################################
         self.model = nn.Sequential(*model)
+        ####################################################################
 
     def forward(self, data):
         """Standard forward"""
@@ -393,7 +402,7 @@ class ResnetGenerator(nn.Module):
 class ResnetBlock(nn.Module):
     """Define a Resnet block"""
 
-    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def __init__(self, dim, padding_type, norm_layer, use_bias, use_dropout):
         """Initialize the Resnet block
 
         A resnet block is a conv block with skip connections
@@ -401,18 +410,18 @@ class ResnetBlock(nn.Module):
         and implement skip connections in <forward> function.
         Original Resnet paper: https://arxiv.org/pdf/1512.03385.pdf
         """
-        super(ResnetBlock, self).__init__()
-        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias)
+        super().__init__()
+        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_bias, use_dropout)
 
-    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def build_conv_block(self, dim, padding_type, norm_layer, use_bias, use_dropout):
         """Construct a convolutional block.
 
         Parameters:
             dim (int)           -- the number of channels in the conv layer.
             padding_type (str)  -- the name of padding layer: reflect | replicate | zero
             norm_layer ()       -- normalization layer
-            use_dropout (bool)  -- if use dropout layers.
             use_bias (bool)     -- if the conv layer uses bias or not
+            use_dropout (bool)  -- if use dropout layers.
 
         Returns a conv block (with a conv layer, a normalization layer, and a non-linearity layer (ReLU))
         """
@@ -453,7 +462,7 @@ class ResnetBlock(nn.Module):
 class UnetGenerator(nn.Module):
     """Create a Unet-based generator"""
 
-    def __init__(self, input_nc, output_nc, num_downs, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False):
+    def __init__(self, input_nc, output_nc, num_downs, ngf=64, norm_layer=nn.BatchNorm2d, use_bias=False, use_dropout=False):
         """Construct a Unet generator
         Parameters:
             input_nc (int)  -- the number of channels in input images
@@ -466,16 +475,19 @@ class UnetGenerator(nn.Module):
         We construct the U-Net from the innermost layer to the outermost layer.
         It is a recursive process.
         """
-        super(UnetGenerator, self).__init__()
+        super().__init__()
         # construct unet structure
-        unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)  # add the innermost layer
+        unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=None, innermost=True, norm_layer=norm_layer, use_bias=use_bias)  # add the innermost layer
         for i in range(num_downs - 5):          # add intermediate layers with ngf * 8 filters
-            unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
+            unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_bias=use_bias, use_dropout=use_dropout)
         # gradually reduce the number of filters from ngf * 8 to ngf
-        unet_block = UnetSkipConnectionBlock(ngf * 4, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(ngf * 2, ngf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        self.model = UnetSkipConnectionBlock(output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer)  # add the outermost layer
+        unet_block = UnetSkipConnectionBlock(ngf * 4, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_bias=use_bias)
+        unet_block = UnetSkipConnectionBlock(ngf * 2, ngf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_bias=use_bias)
+        unet_block = UnetSkipConnectionBlock(ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_bias=use_bias)
+
+        ####################################################################
+        self.model = UnetSkipConnectionBlock(output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer, use_bias=use_bias)  # add the outermost layer
+        ####################################################################
 
     def forward(self, data):
         """Standard forward"""
@@ -489,7 +501,7 @@ class UnetSkipConnectionBlock(nn.Module):
     """
 
     def __init__(self, outer_nc, inner_nc, input_nc=None,
-                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
+                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_bias=False, use_dropout=False):
         """Construct a Unet submodule with skip connections.
 
         Parameters:
@@ -502,12 +514,12 @@ class UnetSkipConnectionBlock(nn.Module):
             norm_layer          -- normalization layer
             use_dropout (bool)  -- if use dropout layers.
         """
-        super(UnetSkipConnectionBlock, self).__init__()
+        super().__init__()
         self.outermost = outermost
-        if type(norm_layer) == functools.partial:
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
+        # if type(norm_layer) == functools.partial:
+        #     use_bias = norm_layer.func == nn.InstanceNorm2d
+        # else:
+        #     use_bias = norm_layer == nn.InstanceNorm2d
         if input_nc is None:
             input_nc = outer_nc
         downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=4,
@@ -598,7 +610,7 @@ def set_requires_grad(nets, requires_grad=False):
                 param.requires_grad = requires_grad
 
 
-## Likely not used in current project
+## Likely not used
 def cal_gradient_penalty(netD, real_data, fake_data, device, dtype='mixed', constant=1.0, lambda_gp=10.0):
     """Calculate the gradient penalty loss, used in WGAN-GP paper https://arxiv.org/abs/1704.00028
 
